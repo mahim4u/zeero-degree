@@ -1,40 +1,80 @@
-module.exports = {
- config:{
- name: "autodl",
- version: "0.0.2",
+module.exports.config = {
+ name: "arrest",
+ version: "2.0.0",
  hasPermssion: 0,
- credits: "SHAON",
- description: "auto video download",
- commandCategory: "user",
- usages: "",
- cooldowns: 5,
-},
-run: async function({ api, event, args }) {},
-handleEvent: async function ({ api, event, args }) {
- const axios = require("axios")
- const request = require("request")
- const fs = require("fs-extra")
- const content = event.body ? event.body : '';
- const body = content.toLowerCase();
- const { alldown } = require("shaon-videos-downloader")
- if (body.startsWith("https://")) {
- api.setMessageReaction("⚠️", event.messageID, (err) => {}, true);
-const data = await alldown(content);
- console.log(data)
- let Shaon = data.url;
- api.setMessageReaction("☢️", event.messageID, (err) => {}, true);
- const video = (await axios.get(Shaon, {
- responseType: "arraybuffer",
- })).data;
- fs.writeFileSync(__dirname + "/cache/auto.mp4", Buffer.from(video, "utf-8"))
-
- return api.sendMessage({
- body: `🔥🚀 𝗜𝘀𝗹𝗮𝗺𝗶𝗰𝗸 𝗰𝗵𝗮𝘁 𝗯𝗼𝘁 | ᵁᴸᴸ⁴ˢᴴ 🔥💻 
-📥⚡𝗔𝘂𝘁𝗼 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿⚡📂
-🎬 𝐄𝐧𝐣𝐨𝐲 𝐭𝐡𝐞 𝐕𝐢𝐝𝐞𝐨 🎀`,
- attachment: fs.createReadStream(__dirname + "/cache/auto.mp4")
-
- }, event.threadID, event.messageID);
+ credits: "MAHIM ISLAM",
+ description: "Arrrest a friend you mention",
+ commandCategory: "tagfun",
+ usages: "[mention]",
+ cooldowns: 2,
+ dependencies: {
+ "axios": "",
+ "fs-extra": "",
+ "path": "",
+ "jimp": ""
  }
+};
+
+module.exports.onLoad = async() => {
+ const { resolve } = global.nodemodule["path"];
+ const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
+ const { downloadFile } = global.utils;
+ const dirMaterial = __dirname + `/cache/canvas/`;
+ const path = resolve(__dirname, 'cache/canvas', 'batgiam.png');
+ if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
+ if (!existsSync(path)) await downloadFile("https://i.imgur.com/ep1gG3r.png", path);
 }
+
+async function makeImage({ one, two }) {
+ const fs = global.nodemodule["fs-extra"];
+ const path = global.nodemodule["path"];
+ const axios = global.nodemodule["axios"]; 
+ const jimp = global.nodemodule["jimp"];
+ const __root = path.resolve(__dirname, "cache", "canvas");
+
+ let batgiam_img = await jimp.read(__root + "/batgiam.png");
+ let pathImg = __root + `/batgiam_${one}_${two}.png`;
+ let avatarOne = __root + `/avt_${one}.png`;
+ let avatarTwo = __root + `/avt_${two}.png`;
+ 
+ let getAvatarOne = (await axios.get(`https://graph.facebook.com/${one}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: 'arraybuffer' })).data;
+ fs.writeFileSync(avatarOne, Buffer.from(getAvatarOne, 'utf-8'));
+ 
+ let getAvatarTwo = (await axios.get(`https://graph.facebook.com/${two}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: 'arraybuffer' })).data;
+ fs.writeFileSync(avatarTwo, Buffer.from(getAvatarTwo, 'utf-8'));
+ 
+ let circleOne = await jimp.read(await circle(avatarOne));
+ let circleTwo = await jimp.read(await circle(avatarTwo));
+ batgiam_img.resize(500, 500).composite(circleOne.resize(100, 100), 375, 9).composite(circleTwo.resize(100, 100), 160, 92);
+ 
+ let raw = await batgiam_img.getBufferAsync("image/png");
+ 
+ fs.writeFileSync(pathImg, raw);
+ fs.unlinkSync(avatarOne);
+ fs.unlinkSync(avatarTwo);
+ 
+ return pathImg;
+}
+async function circle(image) {
+ const jimp = require("jimp");
+ image = await jimp.read(image);
+ image.circle();
+ return await image.getBufferAsync("image/png");
+}
+
+module.exports.run = async function ({ event, api, args }) {
+ const fs = global.nodemodule["fs-extra"];
+ const { threadID, messageID, senderID } = event;
+ var mention = Object.keys(event.mentions)[0]
+ let tag = event.mentions[mention].replace("@", "");
+ if (!mention) return api.sendMessage("Please mention 1 Person", threadID, messageID);
+ else {
+ var one = senderID, two = mention;
+ return makeImage({ one, two }).then(path => api.sendMessage({ body: "—হালা গরু চোর তোরে আজকে হাতে নাতে ধরছি পালাবি কই!_😸💁‍♀️" + tag + '',
+ mentions: [{
+ tag: tag,
+ id: mention
+ }],
+ attachment: fs.createReadStream(path) }, threadID, () => fs.unlinkSync(path), messageID));
+ }
 }
