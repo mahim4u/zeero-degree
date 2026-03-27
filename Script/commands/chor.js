@@ -10,86 +10,80 @@ module.exports.config = {
 };
 
 module.exports.run = async ({ event, api }) => {
-  try {
-    const Canvas = require("canvas");
-    const axios = require("axios");
-    const fs = require("fs-extra");
-    const path = __dirname + "/cache/chor.png";
+	try {
+		const Canvas = global.nodemodule['canvas'];
+		const request = global.nodemodule["node-superfetch"];
+		const fs = global.nodemodule["fs-extra"];
 
-    // 🔥 USER DETECTION
-    let id = event.senderID;
-    if (event.type === "message_reply") {
-      id = event.messageReply.senderID;
-    } else if (Object.keys(event.mentions).length > 0) {
-      id = Object.keys(event.mentions)[0];
-    }
+		const path = __dirname + '/cache/chor.png';
 
-    // 🎭 RANDOM CAPTIONS
-    const captions = [
-      "মুরগির দুধ চুরি করতে গিয়া ধরা খাইছে..! 🐸",
-      "চোর ধরা পড়ছে লাইভে 😭",
-      "ধরা খাইছে বেটা! এখন কি বলবি? 🤡",
-      "এত চুরি করিস কেন রে ভাই 💀",
-      "পুলিশ ডাকবো নাকি? 🚓",
-      "চুরি করতে গিয়ে ক্যামেরায় ধরা 😭",
-      "এবার তো শেষ! 🤣",
-      "চোরের ১০ দিন, গৃহস্থের ১ দিন 😏",
-      "বাবা রে! হাতে নাতে ধরা 😆",
-      "এই মুখটাই চোরের মুখ 🐸👻"
-    ];
+		// 🔥 USER DETECTION
+		let id = event.senderID;
+		if (event.type === "message_reply") {
+			id = event.messageReply.senderID;
+		} else if (Object.keys(event.mentions).length > 0) {
+			id = Object.keys(event.mentions)[0];
+		}
 
-    const randomCaption =
-      captions[Math.floor(Math.random() * captions.length)];
+		// 🎭 RANDOM FUNNY CAPTIONS (goes into the message body)
+		const captions = [
+			"মুরগির দুধ চুরি করতে গিয়া ধরা খাইছে..! 🐸",
+			"চোর ধরা পড়ছে লাইভে 😭",
+			"ধরা খাইছে বেটা! এখন কি বলবি? 🤡",
+			"এত চুরি করিস কেন রে ভাই 💀",
+			"পুলিশ ডাকবো নাকি? 🚓",
+			"চুরি করতে গিয়ে ক্যামেরায় ধরা 😭",
+			"এবার তো শেষ! 🤣",
+			"চোরের ১০ দিন, গৃহস্থের ১ দিন 😏",
+			"বাবা রে! হাতে নাতে ধরা 😆",
+			"এই মুখটাই চোরের মুখ 🐸👻"
+		];
 
-    // 🎨 CANVAS
-    const canvas = Canvas.createCanvas(500, 670);
-    const ctx = canvas.getContext("2d");
+		const randomCaption = captions[Math.floor(Math.random() * captions.length)];
 
-    // 🖼 BACKGROUND
-    const background = await Canvas.loadImage(
-      "https://i.imgur.com/ES28alv.png"
-    );
+		// 🎨 CANVAS SETUP
+		const canvas = Canvas.createCanvas(500, 670);
+		const ctx = canvas.getContext('2d');
 
-    // 🧑 AVATAR FETCH (FIXED)
-    const avatarURL = `https://graph.facebook.com/${id}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
-    const avatar = await axios({
-      url: avatarURL,
-      responseType: "arraybuffer",
-    });
+		// Fetch background and avatar
+		const background = await Canvas.loadImage("https://i.imgur.com/ES28alv.png");
+		const avatarResponse = await request.get(
+			`https://graph.facebook.com/${id}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`
+		);
+		const avatarImg = await Canvas.loadImage(avatarResponse.body);
 
-    const avatarImg = await Canvas.loadImage(avatar.data);
+		// 🖼 DRAW BACKGROUND
+		ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
-    // DRAW BG
-    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+		// 🔵 DRAW CIRCULAR AVATAR (Built-in method, no external function needed)
+		ctx.save();
+		ctx.beginPath();
+		// arc(x_center, y_center, radius, startAngle, endAngle)
+		ctx.arc(48 + 111 / 2, 410 + 111 / 2, 111 / 2, 0, Math.PI * 2);
+		ctx.clip(); // Creates a circular clipping mask
+		ctx.drawImage(avatarImg, 48, 410, 111, 111);
+		ctx.restore();
 
-    // 🔵 CIRCLE AVATAR
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(48 + 55.5, 410 + 55.5, 55.5, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(avatarImg, 48, 410, 111, 111);
-    ctx.restore();
+		// 💾 SAVE TO CACHE
+		const buffer = canvas.toBuffer();
+		fs.writeFileSync(path, buffer);
 
-    // 💾 SAVE
-    fs.writeFileSync(path, canvas.toBuffer());
+		// 📤 SEND MESSAGE
+		api.sendMessage(
+			{
+				body: `😂 ${randomCaption}`,
+				attachment: fs.createReadStream(path)
+			},
+			event.threadID,
+			() => {
+				// Clean up the cache file after sending to save storage
+				if (fs.existsSync(path)) fs.unlinkSync(path);
+			},
+			event.messageID
+		);
 
-    // 📤 SEND
-    return api.sendMessage(
-      {
-        body: `😂 ${randomCaption}`,
-        attachment: fs.createReadStream(path),
-      },
-      event.threadID,
-      () => fs.unlinkSync(path),
-      event.messageID
-    );
-  } catch (e) {
-    console.log(e);
-    return api.sendMessage(
-      "❌ Error: " + e.message,
-      event.threadID,
-      event.messageID
-    );
-  }
+	} catch (e) {
+		console.error(e); // Logs the exact error to your console for debugging
+		api.sendMessage("❌ Error: " + e.message, event.threadID, event.messageID);
+	}
 };
